@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentinelX - Live Disaster Risk Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #0b1221;
+            color: #e5e7eb;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #111827;
+            padding: 1rem 2rem;
+            border-bottom: 2px solid #1f2937;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .logo-icon {
+            font-size: 2rem;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #2ECC71;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .main-container {
+            display: flex;
+            height: calc(100vh - 70px);
+        }
+        
+        #map {
+            flex: 1;
+            background: #0b1221;
+        }
+        
+        .sidebar {
+            width: 380px;
+            background: #111827;
+            border-left: 1px solid #1f2937;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .legend {
+            padding: 1.5rem;
+            border-bottom: 1px solid #1f2937;
+        }
+        
+        .legend h3 {
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            color: #f9fafb;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .legend-color {
+            width: 30px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        .legend-label {
+            font-size: 0.875rem;
+            color: #d1d5db;
+        }
+        
+        .controls {
+            padding: 1.5rem;
+            border-bottom: 1px solid #1f2937;
+        }
+        
+        .control-group {
+            margin-bottom: 1rem;
+        }
+        
+        .control-label {
+            display: block;
+            font-size: 0.875rem;
+            color: #9ca3af;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        select, button {
+            width: 100%;
+            padding: 0.625rem;
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 0.375rem;
+            color: #e5e7eb;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        select:hover, button:hover {
+            background: #374151;
+            border-color: #60A5FA;
+        }
+        
+        button {
+            background: #60A5FA;
+            color: #000;
+            font-weight: 600;
+            border: none;
+            margin-top: 0.5rem;
+        }
+        
+        button:hover {
+            background: #3b82f6;
+        }
+        
+        .stats-panel {
+            padding: 1.5rem;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .stat-card {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #f9fafb;
+        }
+        
+        .country-list {
+            margin-top: 1rem;
+        }
+        
+        .country-item {
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .country-item:hover {
+            background: #374151;
+            border-color: #60A5FA;
+            transform: translateX(-2px);
+        }
+        
+        .country-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .country-name {
+            font-weight: 600;
+            font-size: 1rem;
+            color: #f9fafb;
+        }
+        
+        .risk-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        
+        .risk-safe { background: #2ECC71; color: #000; }
+        .risk-moderate { background: #FFA500; color: #000; }
+        .risk-high { background: #FF4C4C; color: #fff; }
+        
+        .country-details {
+            font-size: 0.875rem;
+            color: #9ca3af;
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .popup-content {
+            min-width: 200px;
+        }
+        
+        .popup-country {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #111827;
+        }
+        
+        .popup-risk {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0.5rem 0;
+        }
+        
+        .popup-details {
+            font-size: 0.875rem;
+            color: #4b5563;
+            margin-top: 0.5rem;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(17, 24, 39, 0.95);
+            padding: 2rem;
+            border-radius: 0.5rem;
+            border: 2px solid #60A5FA;
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #1f2937;
+            border-top-color: #60A5FA;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: 40vh;
+                border-left: none;
+                border-top: 1px solid #1f2937;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">
+            <span class="logo-icon">🛡️</span>
+            <span>SentinelX</span>
+        </div>
+        <div class="status">
+            <span class="status-dot"></span>
+            <span>Live Updates Active</span>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div id="map"></div>
+        
+        <div class="sidebar">
+            <div class="legend">
+                <h3>Risk Levels</h3>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #2ECC71;"></div>
+                    <span class="legend-label">Safe (0-30)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FFA500;"></div>
+                    <span class="legend-label">Moderate (31-60)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FF4C4C;"></div>
+                    <span class="legend-label">High (61-100)</span>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label class="control-label">Hazard Type</label>
+                    <select id="hazardFilter" onchange="updateMap()">
+                        <option value="all">All Hazards</option>
+                        <option value="flood">Flood</option>
+                        <option value="storm">Storm</option>
+                        <option value="fire">Wildfire</option>
+                        <option value="earthquake">Earthquake</option>
+                    </select>
+                </div>
+                
+                <div class="control-group">
+                    <label class="control-label">Time Range</label>
+                    <select id="timeRange" onchange="updateMap()">
+                        <option value="24h">Last 24 Hours</option>
+                        <option value="48h" selected>Last 48 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                    </select>
+                </div>
+                
+                <button onclick="refreshData()">🔄 Refresh Data</button>
+            </div>
+            
+            <div class="stats-panel">
+                <div class="stat-card">
+                    <div class="stat-label">Active Alerts</div>
+                    <div class="stat-value" id="activeAlerts">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-label">High Risk Countries</div>
+                    <div class="stat-value" id="highRiskCount">0</div>
+                </div>
+                
+                <h3 style="margin: 1.5rem 0 1rem; font-size: 1rem;">Countries at Risk</h3>
+                <div class="country-list" id="countryList"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <div>Loading risk data...</div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map', {
+            center: [20, 0],
+            zoom: 2,
+            minZoom: 2,
+            maxZoom: 10,
+            worldCopyJump: true
+        });
+        
+        // Dark tile layer
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+        
+        let countryLayers = {};
+        let riskData = [];
+        
+        // ML Model - Risk Prediction Function
+        function predictRisk(country) {
+            // Simulate ML model with realistic factors
+            const factors = {
+                // Weather factors (simulated from NASA data)
+                temperature: Math.random() * 45 + 10,
+                precipitation: Math.random() * 200,
+                humidity: Math.random() * 100,
+                windSpeed: Math.random() * 80,
+                
+                // Satellite data factors
+                fireHotspots: Math.floor(Math.random() * 100),
+                vegetationIndex: Math.random(),
+                soilMoisture: Math.random(),
+                
+                // Historical factors
+                historicalEvents: Math.floor(Math.random() * 20),
+                seasonalRisk: Math.random()
+            };
+            
+            // ML-style risk calculation (weighted features)
+            let riskScore = 0;
+            
+            // Temperature risk (heat waves)
+            if (factors.temperature > 35) {
+                riskScore += (factors.temperature - 35) * 2;
+            }
+            
+            // Precipitation risk (floods)
+            if (factors.precipitation > 100) {
+                riskScore += (factors.precipitation - 100) * 0.3;
+            }
+            
+            // Fire risk
+            riskScore += factors.fireHotspots * 0.5;
+            riskScore += (1 - factors.vegetationIndex) * 20;
+            
+            // Wind risk (storms)
+            if (factors.windSpeed > 40) {
+                riskScore += (factors.windSpeed - 40) * 1.5;
+            }
+            
+            // Soil moisture (drought/flood)
+            if (factors.soilMoisture < 0.3) {
+                riskScore += 15; // Drought risk
+            } else if (factors.soilMoisture > 0.8) {
+                riskScore += 20; // Flood risk
+            }
+            
+            // Historical and seasonal adjustments
+            riskScore += factors.historicalEvents * 2;
+            riskScore += factors.seasonalRisk * 10;
+            
+            // Normalize to 0-100
+            riskScore = Math.min(100, Math.max(0, riskScore));
+            
+            // Determine hazard type based on dominant factor
+            let hazardType = 'general';
+            if (factors.precipitation > 100) hazardType = 'flood';
+            else if (factors.fireHotspots > 30) hazardType = 'fire';
+            else if (factors.windSpeed > 50) hazardType = 'storm';
+            else if (factors.temperature < 0) hazardType = 'freeze';
+            
+            return {
+                score: Math.round(riskScore),
+                level: riskScore > 60 ? 'high' : riskScore > 30 ? 'moderate' : 'safe',
+                hazardType: hazardType,
+                factors: factors
+            };
+        }
+        
+        // Country data with coordinates
+        const countries = [
+            { code: 'EG', name: 'Egypt', lat: 26.8, lng: 30.8, radius: 600000 },
+            { code: 'SA', name: 'Saudi Arabia', lat: 24.0, lng: 45.0, radius: 800000 },
+            { code: 'BD', name: 'Bangladesh', lat: 23.8, lng: 90.4, radius: 250000 },
+            { code: 'US', name: 'United States', lat: 37.0, lng: -95.7, radius: 1500000 },
+            { code: 'BR', name: 'Brazil', lat: -10.0, lng: -55.0, radius: 1200000 },
+            { code: 'IN', name: 'India', lat: 20.5, lng: 78.9, radius: 900000 },
+            { code: 'CN', name: 'China', lat: 35.0, lng: 105.0, radius: 1300000 },
+            { code: 'AU', name: 'Australia', lat: -25.0, lng: 133.0, radius: 1200000 },
+            { code: 'ID', name: 'Indonesia', lat: -2.5, lng: 118.0, radius: 700000 },
+            { code: 'PH', name: 'Philippines', lat: 12.8, lng: 121.7, radius: 400000 },
+            { code: 'JP', name: 'Japan', lat: 36.2, lng: 138.2, radius: 500000 },
+            { code: 'IT', name: 'Italy', lat: 41.9, lng: 12.6, radius: 350000 },
+            { code: 'ES', name: 'Spain', lat: 40.4, lng: -3.7, radius: 400000 },
+            { code: 'FR', name: 'France', lat: 46.2, lng: 2.2, radius: 450000 },
+            { code: 'DE', name: 'Germany', lat: 51.1, lng: 10.4, radius: 350000 },
+            { code: 'GB', name: 'United Kingdom', lat: 55.3, lng: -3.4, radius: 300000 },
+            { code: 'MX', name: 'Mexico', lat: 23.6, lng: -102.5, radius: 700000 },
+            { code: 'NG', name: 'Nigeria', lat: 9.0, lng: 8.0, radius: 400000 },
+            { code: 'ZA', name: 'South Africa', lat: -30.5, lng: 22.9, radius: 500000 },
+            { code: 'TR', name: 'Turkey', lat: 38.9, lng: 35.2, radius: 400000 }
+        ];
+        
+        function getRiskColor(score) {
+            if (score > 60) return '#FF4C4C';
+            if (score > 30) return '#FFA500';
+            return '#2ECC71';
+        }
+        
+        function getRiskLevel(score) {
+            if (score > 60) return 'high';
+            if (score > 30) return 'moderate';
+            return 'safe';
+        }
+        
+        function updateMap() {
+            // Clear existing layers
+            Object.values(countryLayers).forEach(layer => {
+                map.removeLayer(layer);
+            });
+            countryLayers = {};
+            riskData = [];
+            
+            const hazardFilter = document.getElementById('hazardFilter').value;
+            let activeAlerts = 0;
+            let highRiskCount = 0;
+            
+            // Generate risk data for each country
+            countries.forEach(country => {
+                const risk = predictRisk(country);
+                
+                // Apply hazard filter
+                if (hazardFilter !== 'all' && risk.hazardType !== hazardFilter) {
+                    return;
+                }
+                
+                riskData.push({
+                    ...country,
+                    ...risk
+                });
+                
+                if (risk.level === 'high') {
+                    highRiskCount++;
+                    activeAlerts++;
+                } else if (risk.level === 'moderate') {
+                    activeAlerts++;
+                }
+                
+                // Create circle marker for country
+                const circle = L.circle([country.lat, country.lng], {
+                    color: getRiskColor(risk.score),
+                    fillColor: getRiskColor(risk.score),
+                    fillOpacity: 0.5,
+                    radius: country.radius,
+                    weight: 2
+                }).addTo(map);
+                
+                // Popup
+                const popupContent = `
+                    <div class="popup-content">
+                        <div class="popup-country">${country.name}</div>
+                        <div class="popup-risk" style="color: ${getRiskColor(risk.score)}">
+                            Risk: ${risk.score}/100
+                        </div>
+                        <div class="popup-details">
+                            <strong>Level:</strong> ${risk.level.toUpperCase()}<br>
+                            <strong>Hazard:</strong> ${risk.hazardType}<br>
+                            <strong>Temp:</strong> ${risk.factors.temperature.toFixed(1)}°C<br>
+                            <strong>Precipitation:</strong> ${risk.factors.precipitation.toFixed(0)}mm<br>
+                            <strong>Fire Hotspots:</strong> ${risk.factors.fireHotspots}
+                        </div>
+                    </div>
+                `;
+                
+                circle.bindPopup(popupContent);
+                
+                // Store layer reference
+                countryLayers[country.code] = circle;
+            });
+            
+            // Update stats
+            document.getElementById('activeAlerts').textContent = activeAlerts;
+            document.getElementById('highRiskCount').textContent = highRiskCount;
+            
+            // Update country list
+            updateCountryList();
+        }
+        
+        function updateCountryList() {
+            const sortedData = riskData.sort((a, b) => b.score - a.score);
+            const listHTML = sortedData.slice(0, 10).map(country => `
+                <div class="country-item" onclick="flyToCountry('${country.code}')">
+                    <div class="country-header">
+                        <div class="country-name">${country.name}</div>
+                        <div class="risk-badge risk-${country.level}">${country.score}</div>
+                    </div>
+                    <div class="country-details">
+                        <span>🌡️ ${country.factors.temperature.toFixed(0)}°C</span>
+                        <span>💧 ${country.factors.precipitation.toFixed(0)}mm</span>
+                        <span>🔥 ${country.factors.fireHotspots}</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('countryList').innerHTML = listHTML;
+        }
+        
+        function flyToCountry(code) {
+            const country = countries.find(c => c.code === code);
+            if (country && countryLayers[code]) {
+                map.flyTo([country.lat, country.lng], 5, {
+                    duration: 1.5
+                });
+                countryLayers[code].openPopup();
+            }
+        }
+        
+        function refreshData() {
+            document.getElementById('loading').style.display = 'block';
+            setTimeout(() => {
+                updateMap();
+                document.getElementById('loading').style.display = 'none';
+            }, 1000);
+        }
+        
+        // Initial load
+        setTimeout(() => {
+            updateMap();
+            document.getElementById('loading').style.display = 'none';
+        }, 1500);
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            updateMap();
+        }, 30000);
+    </script>
+</body>
+</html>
